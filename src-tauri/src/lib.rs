@@ -1,7 +1,9 @@
 pub mod commands;
 pub mod cursor_poller;
 pub mod models;
+pub mod shortcut;
 pub mod store;
+pub mod tray;
 pub mod window_manager;
 
 pub use commands::*;
@@ -17,8 +19,21 @@ pub fn run() {
                         .build(),
                 )?;
             }
+            app.handle().plugin(tauri_plugin_global_shortcut::Builder::new().build())?;
             cursor_poller::start_cursor_polling(app.handle().clone());
+            tray::setup_system_tray(app.handle())?;
+            if let Err(e) = shortcut::setup_global_shortcut(app.handle()) {
+                log::warn!("Failed to setup global shortcut: {}", e);
+            }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::load_panels,

@@ -55,6 +55,32 @@ describe('scrollMath', () => {
       expect(resNegative).toBe(50);
     });
 
+    it('returns currentOffset unchanged when contentSize is 0 or negative', () => {
+      const resZero = calculateNextOffset({
+        mode: 'horizontal',
+        currentOffset: 100,
+        speed: 100,
+        deltaMs: 16,
+        containerSize: 400,
+        contentSize: 0,
+        loop: true,
+        paused: false,
+      });
+      expect(resZero).toBe(100);
+
+      const resNegative = calculateNextOffset({
+        mode: 'horizontal',
+        currentOffset: 100,
+        speed: 100,
+        deltaMs: 16,
+        containerSize: 400,
+        contentSize: -20,
+        loop: true,
+        paused: false,
+      });
+      expect(resNegative).toBe(100);
+    });
+
     it('increments offset based on speed and delta time for horizontal scroll', () => {
       // speed 100px/s, 100ms delta => moves 10px left
       const next = calculateNextOffset({

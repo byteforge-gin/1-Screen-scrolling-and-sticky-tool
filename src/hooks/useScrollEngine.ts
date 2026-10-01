@@ -34,13 +34,23 @@ export function useScrollEngine(
     initialOffset !== undefined ? initialOffset : getDefaultOffset()
   );
 
-  const [localPaused, setLocalPaused] = useState(false);
+  const [localOverride, setLocalOverride] = useState<boolean | null>(null);
 
-  const isPaused = Boolean(globalPaused || scrollConfig.paused || localPaused);
+  // Reset local override when external scrollConfig.paused changes
+  useEffect(() => {
+    setLocalOverride(null);
+  }, [scrollConfig.paused]);
+
+  const isPaused = Boolean(
+    globalPaused || (localOverride !== null ? localOverride : scrollConfig.paused)
+  );
 
   const togglePause = useCallback(() => {
-    setLocalPaused((prev) => !prev);
-  }, []);
+    setLocalOverride((prev) => {
+      const current = prev !== null ? prev : scrollConfig.paused;
+      return !current;
+    });
+  }, [scrollConfig.paused]);
 
   const resetOffset = useCallback(
     (newOffset?: number) => {
@@ -49,12 +59,18 @@ export function useScrollEngine(
     [getDefaultOffset]
   );
 
-  // If mode switches to 'none', reset offset to 0
+  // Handle mode transitions: reset to 0 when entering 'none', reset to containerSize when leaving 'none'
+  const prevModeRef = useRef(scrollConfig.mode);
   useEffect(() => {
-    if (scrollConfig.mode === 'none') {
-      setOffset(0);
+    if (prevModeRef.current !== scrollConfig.mode) {
+      if (scrollConfig.mode === 'none') {
+        setOffset(0);
+      } else if (prevModeRef.current === 'none') {
+        setOffset(containerSize);
+      }
+      prevModeRef.current = scrollConfig.mode;
     }
-  }, [scrollConfig.mode]);
+  }, [scrollConfig.mode, containerSize]);
 
   // Keep latest parameters in ref so rAF loop always has current state without restarting
   const paramsRef = useRef({
@@ -73,8 +89,12 @@ export function useScrollEngine(
     };
   }, [scrollConfig, containerSize, contentSize, isPaused]);
 
-  // Animation frame loop
+  // Animation frame loop: avoids scheduling frames when mode is 'none'
   useEffect(() => {
+    if (scrollConfig.mode === 'none') {
+      return;
+    }
+
     let lastTime: number | null = null;
     let rafId: number | null = null;
 
@@ -111,7 +131,7 @@ export function useScrollEngine(
         cancelAnimationFrame(rafId);
       }
     };
-  }, []);
+  }, [scrollConfig.mode]);
 
   return {
     offset,

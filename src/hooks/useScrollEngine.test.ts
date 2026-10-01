@@ -190,6 +190,104 @@ describe('useScrollEngine', () => {
     expect(result.current.offset).toBe(95);
   });
 
+  it('allows togglePause to unpause when scrollConfig.paused is initially true', () => {
+    const scroll: PanelScroll = {
+      mode: 'horizontal',
+      speed: 100,
+      loop: true,
+      paused: true,
+    };
+
+    const { result } = renderHook(() =>
+      useScrollEngine(scroll, 400, 200, false, 100)
+    );
+
+    expect(result.current.isPaused).toBe(true);
+
+    act(() => {
+      stepFrame(16);
+    });
+
+    // Toggle pause while initially paused => should now be unpaused!
+    act(() => {
+      result.current.togglePause();
+    });
+
+    expect(result.current.isPaused).toBe(false);
+
+    act(() => {
+      stepFrame(50);
+    });
+
+    // 100px/s * 50ms = 5px movement => 95
+    expect(result.current.offset).toBe(95);
+  });
+
+  it('resets local pause override when scrollConfig.paused prop updates', () => {
+    const scroll: PanelScroll = {
+      mode: 'horizontal',
+      speed: 100,
+      loop: true,
+      paused: false,
+    };
+
+    const { result, rerender } = renderHook(
+      ({ s }) => useScrollEngine(s, 400, 200, false, 100),
+      { initialProps: { s: scroll } }
+    );
+
+    // Override to pause
+    act(() => {
+      result.current.togglePause();
+    });
+    expect(result.current.isPaused).toBe(true);
+
+    // Prop updates to paused: true (overrides/clears local toggle)
+    rerender({ s: { ...scroll, paused: true } });
+    expect(result.current.isPaused).toBe(true);
+
+    // Now external prop unpauses
+    rerender({ s: { ...scroll, paused: false } });
+    expect(result.current.isPaused).toBe(false);
+  });
+
+  it('does not schedule requestAnimationFrame when mode is none', () => {
+    const scroll: PanelScroll = {
+      mode: 'none',
+      speed: 100,
+      loop: true,
+      paused: false,
+    };
+
+    renderHook(() =>
+      useScrollEngine(scroll, 400, 200, false)
+    );
+
+    expect(mockRafCallbacks.size).toBe(0);
+  });
+
+  it('resets offset to containerSize when mode transitions from none to horizontal or vertical', () => {
+    let scroll: PanelScroll = {
+      mode: 'none',
+      speed: 100,
+      loop: true,
+      paused: false,
+    };
+
+    const { result, rerender } = renderHook(
+      ({ s }) => useScrollEngine(s, 400, 200, false),
+      { initialProps: { s: scroll } }
+    );
+
+    expect(result.current.offset).toBe(0);
+
+    // Transition to horizontal
+    scroll = { ...scroll, mode: 'horizontal' };
+    rerender({ s: scroll });
+
+    expect(result.current.offset).toBe(400);
+  });
+
   it('resets offset using resetOffset', () => {
     const scroll: PanelScroll = {
       mode: 'horizontal',

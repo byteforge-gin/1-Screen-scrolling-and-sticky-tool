@@ -29,7 +29,7 @@ export function calculateNextOffset({
   loop,
   paused,
 }: ScrollStepParams): number {
-  if (mode === 'none' || paused || speed <= 0) {
+  if (mode === 'none' || paused || speed <= 0 || contentSize <= 0) {
     return currentOffset;
   }
 

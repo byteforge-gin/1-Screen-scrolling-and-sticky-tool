@@ -1,0 +1,129 @@
+name: Release Windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: '可选：手动触发时给产物起的 tag 名（留空则只上传 artifact，不创建 Release）'
+        required: false
+
+jobs:
+  build-windows:
+    name: Build Windows Application
+    runs-on: windows-latest
+
+    env:
+      APP_NAME: 'screen-scroller-sticky-tool'
+      APP_DISPLAY_NAME: '屏幕字幕与便签工具'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build Tauri Application
+        run: pnpm tauri build
+
+      - name: Compute version & asset names
+        id: meta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VER="${GITHUB_REF#refs/tags/}"
+          elif [[ -n "${{ github.event.inputs.release_tag }}" ]]; then
+            VER="${{ github.event.inputs.release_tag }}"
+          else
+            VER="dev-${{ github.run_id }}"
+          fi
+          VER_NO_V="${VER#v}"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "version_no_v=$VER_NO_V" >> "$GITHUB_OUTPUT"
+
+      - name: Locate and prepare artifacts
+        id: artifacts
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.meta.outputs.version_no_v }}"
+          $distDir = "dist-release"
+          if (Test-Path $distDir) { Remove-Item -Recurse -Force $distDir }
+          New-Item -ItemType Directory -Path $distDir | Out-Null
+
+          # 1. 查找并重命名 NSIS 安装程序
+          $nsisFiles = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis/*.exe" -ErrorAction SilentlyContinue
+          if ($nsisFiles) {
+              $installerTarget = "$distDir/${{ env.APP_NAME }}-windows-x64-setup-$ver.exe"
+              Copy-Item $nsisFiles[0].FullName $installerTarget
+              Write-Host "Found NSIS installer: $installerTarget"
+          }
+
+          # 2. 查找并准备便携独立版 exe
+          $exePath = "src-tauri/target/release/${{ env.APP_NAME }}.exe"
+          if (Test-Path $exePath) {
+              $portableDir = "portable-temp"
+              if (Test-Path $portableDir) { Remove-Item -Recurse -Force $portableDir }
+              New-Item -ItemType Directory -Path $portableDir | Out-Null
+
+              Copy-Item $exePath "$portableDir/${{ env.APP_NAME }}.exe"
+
+              $readmeContent = @"
+          ${{ env.APP_DISPLAY_NAME }} (Windows 免安装绿色版)
+          ====================================
+
+          ▣ 启动方式：
+            双击 ${{ env.APP_NAME }}.exe 即可直接使用。
+
+          ▣ 说明：
+            - 本工具支持屏幕置顶、平滑滚动字幕（提词器）和静态桌面便签。
+            - 鼠标悬停在字幕或便签上可呼出控制条及拖动调整位置，鼠标移出自动恢复点击穿透。
+            - 全局快捷键：Ctrl + Alt + 空格（暂停/恢复所有滚动）。
+          "@
+              Set-Content -Path "$portableDir/使用说明.txt" -Value $readmeContent -Encoding utf8
+
+              $zipTarget = "$distDir/${{ env.APP_NAME }}-windows-x64-portable-$ver.zip"
+              Compress-Archive -Path "$portableDir/*" -DestinationPath $zipTarget -Force
+              Write-Host "Created portable zip: $zipTarget"
+          }
+
+          Get-ChildItem $distDir | Select-Object Name, Length
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-windows-x64-${{ steps.meta.outputs.version_no_v }}
+          path: dist-release/*
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.version }}
+          name: ${{ steps.meta.outputs.version }}
+          generate_release_notes: true
+          files: dist-release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

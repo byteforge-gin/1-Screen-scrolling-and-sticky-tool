@@ -376,4 +376,202 @@ describe('App & Router Integration', () => {
 
     expect(await screen.findByText('屏幕字幕与便签管理')).toBeInTheDocument();
   });
+
+  it('updates position and debounces save_panels when incoming panel:sync-rect event is received (Moved sync)', async () => {
+    window.location.hash = '#/';
+    const panel = createDefaultPanel('窗口位移测试');
+    panel.position = { x: 50, y: 50 };
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'load_panels') {
+        return Promise.resolve({
+          panels: [panel],
+          globalPaused: false,
+          hotkey: 'Ctrl+Alt+Space',
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    render(<App />);
+    expect(await screen.findByText('窗口位移测试')).toBeInTheDocument();
+
+    vi.useFakeTimers();
+
+    // Simulate Rust WindowEvent::Moved emitting panel:sync-rect
+    act(() => {
+      triggerMockTauriEvent('panel:sync-rect', {
+        id: panel.id,
+        position: { x: 280, y: 350 },
+      });
+    });
+
+    // Advance timers by 300ms debounce
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith(
+      'save_panels',
+      expect.objectContaining({
+        state: expect.objectContaining({
+          panels: expect.arrayContaining([
+            expect.objectContaining({
+              id: panel.id,
+              position: { x: 280, y: 350 },
+            }),
+          ]),
+        }),
+      })
+    );
+  });
+
+  it('invokes open_or_focus_overlay with new position and size when panel is updated in MainDashboard while visible', async () => {
+    window.location.hash = '#/';
+    const panel = createDefaultPanel('编辑同步测试');
+    panel.visible = true;
+    panel.position = { x: 100, y: 100 };
+    panel.size = { width: 400, height: 120 };
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'load_panels') {
+        return Promise.resolve({
+          panels: [panel],
+          globalPaused: false,
+          hotkey: 'Ctrl+Alt+Space',
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    render(<App />);
+    expect(await screen.findByText('编辑同步测试')).toBeInTheDocument();
+
+    // Open edit modal
+    const editBtn = screen.getByTestId(`edit-panel-${panel.id}`);
+    act(() => {
+      fireEvent.click(editBtn);
+    });
+
+    expect(screen.getByTestId('panel-edit-modal')).toBeInTheDocument();
+
+    // Change X position and width
+    const xInput = screen.getByTestId('modal-input-pos-x');
+    const widthInput = screen.getByTestId('modal-input-width');
+
+    act(() => {
+      fireEvent.change(xInput, { target: { value: '350' } });
+      fireEvent.change(widthInput, { target: { value: '600' } });
+    });
+
+    // Save modal
+    const saveBtn = screen.getByTestId('modal-btn-save');
+    act(() => {
+      fireEvent.click(saveBtn);
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith('open_or_focus_overlay', {
+      id: panel.id,
+      x: 350,
+      y: 100,
+      width: 600,
+      height: 120,
+    });
+  });
+
+  it('toggles visibility of all panels on panel:toggle-all-visibility event', async () => {
+    window.location.hash = '#/';
+    const p1 = createDefaultPanel('面板1');
+    p1.visible = true;
+    const p2 = createDefaultPanel('面板2');
+    p2.visible = false;
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'load_panels') {
+        return Promise.resolve({
+          panels: [p1, p2],
+          globalPaused: false,
+          hotkey: 'Ctrl+Alt+Space',
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    render(<App />);
+    expect(await screen.findByText('面板1')).toBeInTheDocument();
+    expect(screen.getByText('面板2')).toBeInTheDocument();
+
+    // 1. One is visible -> emit toggle-all-visibility -> should hide both
+    act(() => {
+      triggerMockTauriEvent('panel:toggle-all-visibility', {});
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith('close_overlay', { id: p1.id });
+    expect(mockInvoke).toHaveBeenCalledWith('close_overlay', { id: p2.id });
+
+    // 2. Now both are hidden -> emit toggle-all-visibility again -> should show both
+    act(() => {
+      triggerMockTauriEvent('panel:toggle-all-visibility', {});
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith('open_or_focus_overlay', {
+      id: p1.id,
+      x: p1.position.x,
+      y: p1.position.y,
+      width: p1.size.width,
+      height: p1.size.height,
+    });
+    expect(mockInvoke).toHaveBeenCalledWith('open_or_focus_overlay', {
+      id: p2.id,
+      x: p2.position.x,
+      y: p2.position.y,
+      width: p2.size.width,
+      height: p2.size.height,
+    });
+  });
+
+  it('toggles single panel visibility via MainContainer toggle button', async () => {
+    window.location.hash = '#/';
+    const panel = createDefaultPanel('单面板显隐');
+    panel.visible = false;
+    panel.position = { x: 100, y: 150 };
+    panel.size = { width: 400, height: 120 };
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'load_panels') {
+        return Promise.resolve({
+          panels: [panel],
+          globalPaused: false,
+          hotkey: 'Ctrl+Alt+Space',
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    render(<App />);
+    expect(await screen.findByText('单面板显隐')).toBeInTheDocument();
+
+    // Currently hidden, click to show
+    const toggleBtn = screen.getByTestId(`toggle-visible-${panel.id}`);
+    expect(toggleBtn).toHaveTextContent('已隐藏');
+
+    act(() => {
+      fireEvent.click(toggleBtn);
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith('open_or_focus_overlay', {
+      id: panel.id,
+      x: 100,
+      y: 150,
+      width: 400,
+      height: 120,
+    });
+
+    // Now shown, click to hide
+    act(() => {
+      fireEvent.click(toggleBtn);
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith('close_overlay', { id: panel.id });
+  });
 });

@@ -7,6 +7,7 @@ pub mod tray;
 pub mod window_manager;
 
 pub use commands::*;
+use tauri::Emitter;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -27,13 +28,28 @@ pub fn run() {
             }
             Ok(())
         })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
                 if window.label() == "main" {
                     api.prevent_close();
                     let _ = window.hide();
                 }
             }
+            tauri::WindowEvent::Moved(pos) => {
+                if let Some(id) = window.label().strip_prefix("overlay_") {
+                    let scale = window.scale_factor().unwrap_or(1.0);
+                    let logical_x = pos.x as f64 / scale;
+                    let logical_y = pos.y as f64 / scale;
+                    let _ = window.emit(
+                        "panel:sync-rect",
+                        serde_json::json!({
+                            "id": id,
+                            "position": { "x": logical_x, "y": logical_y }
+                        }),
+                    );
+                }
+            }
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             commands::load_panels,

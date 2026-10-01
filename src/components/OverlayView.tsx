@@ -5,6 +5,7 @@ import { ResizeHandles } from './ResizeHandles';
 import { QuickEditPopover } from './QuickEditPopover';
 import { GripHorizontal, Play, Pause, Plus, Minus, Pencil } from 'lucide-react';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 
 export interface OverlayViewProps {
   panel: PanelConfig;
@@ -163,11 +164,38 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
   const handleDragMouseDown = async (e: React.MouseEvent) => {
     if (e.button === 0) {
       try {
-        const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
         await getCurrentWebviewWindow().startDragging();
       } catch {
         // Ignore outside Tauri
       }
+    }
+  };
+
+  const handleBackgroundMouseDown = async (e: React.MouseEvent) => {
+    if (e.button !== 0 || !effectiveHover) {
+      return;
+    }
+
+    const target = e.target as HTMLElement;
+
+    // Do not trigger background drag if clicking on text or controls
+    if (
+      target.closest('[data-testid="scroll-content"]') ||
+      target.closest('[data-testid="overlay-controls"]') ||
+      target.closest('[data-testid="quick-edit-popover"]') ||
+      target.closest('[data-direction]') ||
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('textarea') ||
+      target.closest('select')
+    ) {
+      return;
+    }
+
+    try {
+      await getCurrentWebviewWindow().startDragging();
+    } catch {
+      // Ignore outside Tauri
     }
   };
 
@@ -226,8 +254,10 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
   return (
     <div
       ref={containerRef}
+      data-testid="overlay-container"
       onMouseEnter={() => setInternalHover(true)}
       onMouseLeave={() => setInternalHover(false)}
+      onMouseDown={handleBackgroundMouseDown}
       style={{
         backgroundColor: hexToRgba(panel.style.bgColor, panel.style.bgOpacity),
         width: '100%',
@@ -338,6 +368,7 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
         <div
           ref={contentRef}
           data-testid="scroll-content"
+          className="pointer-events-auto"
           style={{
             transform: getTransform(),
             whiteSpace: isHorizontal ? 'nowrap' : 'pre-wrap',

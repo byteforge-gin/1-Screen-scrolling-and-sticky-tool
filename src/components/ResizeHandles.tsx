@@ -1,5 +1,7 @@
 import React, { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
 import { PanelConfig } from '../types/panel';
 
 export type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se';
@@ -53,8 +55,6 @@ const HANDLE_CONFIGS: {
 
 async function syncTauriWindow(width: number, height: number, x: number, y: number) {
   try {
-    const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-    const { LogicalSize, LogicalPosition } = await import('@tauri-apps/api/dpi');
     const win = getCurrentWebviewWindow();
     await win.setSize(new LogicalSize(width, height));
     await win.setPosition(new LogicalPosition(x, y));

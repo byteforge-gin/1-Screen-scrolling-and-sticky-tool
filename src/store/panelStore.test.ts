@@ -8,6 +8,7 @@ import {
   updatePanel,
   removePanel,
   toggleVisible,
+  toggleAllVisibility,
   togglePause,
   setGlobalPause,
   toggleGlobalPause,
@@ -132,6 +133,24 @@ describe('panelStore', () => {
       expect(s2.panels[0].visible).toBe(true);
     });
 
+    it('toggles all panels visibility (TOGGLE_ALL_VISIBILITY)', () => {
+      const p1 = createDefaultPanel('P1');
+      p1.visible = true;
+      const p2 = createDefaultPanel('P2');
+      p2.visible = false;
+      const stateWithPanels: AppState = { ...initialState, panels: [p1, p2] };
+
+      // When at least one is visible, toggling all hides all
+      const s1 = panelReducer(stateWithPanels, { type: 'TOGGLE_ALL_VISIBILITY' });
+      expect(s1.panels[0].visible).toBe(false);
+      expect(s1.panels[1].visible).toBe(false);
+
+      // When all are hidden, toggling all shows all
+      const s2 = panelReducer(s1, { type: 'TOGGLE_ALL_VISIBILITY' });
+      expect(s2.panels[0].visible).toBe(true);
+      expect(s2.panels[1].visible).toBe(true);
+    });
+
     it('toggles panel pause (TOGGLE_PAUSE)', () => {
       const p = createDefaultPanel('P1');
       expect(p.scroll.paused).toBe(false);
@@ -207,6 +226,9 @@ describe('panelStore', () => {
       expect(toggleVisible('123')).toEqual({
         type: 'TOGGLE_VISIBLE',
         payload: { id: '123' },
+      });
+      expect(toggleAllVisibility()).toEqual({
+        type: 'TOGGLE_ALL_VISIBILITY',
       });
       expect(togglePause('123')).toEqual({
         type: 'TOGGLE_PAUSE',

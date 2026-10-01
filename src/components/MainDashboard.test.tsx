@@ -117,12 +117,12 @@ describe('MainDashboard', () => {
     expect(screen.getByTestId('global-pause-btn')).toHaveTextContent(/全部继续|全部恢复/);
   });
 
-  it('toggles visibility and invokes Tauri window manager commands', async () => {
-    const { invoke } = await import('@tauri-apps/api/core');
+  it('toggles visibility and invokes onToggleVisible callback', () => {
     const p = createDefaultPanel('显示面板');
     p.visible = false;
     p.position = { x: 150, y: 250 };
     p.size = { width: 500, height: 160 };
+    const onToggleVisible = vi.fn();
 
     const { rerender } = render(
       <MainDashboard
@@ -130,19 +130,14 @@ describe('MainDashboard', () => {
         onAdd={vi.fn()}
         onUpdate={vi.fn()}
         onDelete={vi.fn()}
+        onToggleVisible={onToggleVisible}
       />
     );
 
     const toggleVisBtn = screen.getByTestId(`toggle-visible-${p.id}`);
     fireEvent.click(toggleVisBtn);
 
-    expect(invoke).toHaveBeenCalledWith('open_or_focus_overlay', {
-      id: p.id,
-      x: 150,
-      y: 250,
-      width: 500,
-      height: 160,
-    });
+    expect(onToggleVisible).toHaveBeenCalledWith(p.id);
 
     // When toggling from visible to hidden
     p.visible = true;
@@ -152,15 +147,15 @@ describe('MainDashboard', () => {
         onAdd={vi.fn()}
         onUpdate={vi.fn()}
         onDelete={vi.fn()}
+        onToggleVisible={onToggleVisible}
       />
     );
 
     const toggleVisBtn2 = screen.getByTestId(`toggle-visible-${p.id}`);
     fireEvent.click(toggleVisBtn2);
 
-    expect(invoke).toHaveBeenCalledWith('close_overlay', {
-      id: p.id,
-    });
+    expect(onToggleVisible).toHaveBeenCalledTimes(2);
+    expect(onToggleVisible).toHaveBeenLastCalledWith(p.id);
   });
 
   it('toggles pause on single panel when pause button is clicked', () => {

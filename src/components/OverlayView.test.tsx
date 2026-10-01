@@ -6,6 +6,15 @@ import { PanelConfig } from '../types/panel';
 
 let eventHandler: ((event: { payload: { id: string; isHovered: boolean } }) => void) | null = null;
 const mockListeners = new Map<string, Array<(event: any) => void>>();
+const mockStartDragging = vi.fn();
+
+vi.mock('@tauri-apps/api/webviewWindow', () => ({
+  getCurrentWebviewWindow: () => ({
+    startDragging: () => mockStartDragging(),
+    setSize: vi.fn(),
+    setPosition: vi.fn(),
+  }),
+}));
 
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn((eventName: string, handler: any) => {
@@ -521,5 +530,40 @@ describe('OverlayView', () => {
         size: { width: 430, height: 120 },
       })
     );
+  });
+
+  it('triggers startDragging on background mousedown when hovered, but not on text or controls', () => {
+    mockStartDragging.mockClear();
+    const panel = createDefaultPanel('拖拽测试');
+    const { rerender } = render(
+      <OverlayView panel={panel} isHovered={true} onUpdate={() => {}} />
+    );
+
+    const container = screen.getByTestId('overlay-container');
+    const textContent = screen.getByTestId('scroll-content');
+    const pauseBtn = screen.getByTestId('toggle-pause-btn');
+
+    // 1. Mousedown on text -> should NOT start dragging
+    fireEvent.mouseDown(textContent, { button: 0 });
+    expect(mockStartDragging).not.toHaveBeenCalled();
+
+    // 2. Mousedown on controls button -> should NOT start dragging from container
+    fireEvent.mouseDown(pauseBtn, { button: 0 });
+    expect(mockStartDragging).not.toHaveBeenCalled();
+
+    // 3. Mousedown on background container -> SHOULD start dragging
+    fireEvent.mouseDown(container, { button: 0 });
+    expect(mockStartDragging).toHaveBeenCalledTimes(1);
+
+    // 4. Mousedown on background container with right-click (button 2) -> should NOT start dragging
+    mockStartDragging.mockClear();
+    fireEvent.mouseDown(container, { button: 2 });
+    expect(mockStartDragging).not.toHaveBeenCalled();
+
+    // 5. When not hovered -> background mousedown should NOT start dragging
+    rerender(<OverlayView panel={panel} isHovered={false} onUpdate={() => {}} />);
+    mockStartDragging.mockClear();
+    fireEvent.mouseDown(container, { button: 0 });
+    expect(mockStartDragging).not.toHaveBeenCalled();
   });
 });

@@ -184,8 +184,12 @@ pub fn poll_cursor_tick(app: &AppHandle) {
 
             let is_visible = window.is_visible().unwrap_or(false);
             let is_in_hotzone = if is_visible {
-                let pos = window.outer_position().unwrap_or_default();
-                let size = window.outer_size().unwrap_or_default();
+                let Ok(pos) = window.outer_position() else {
+                    continue;
+                };
+                let Ok(size) = window.outer_size() else {
+                    continue;
+                };
                 let scale = window.scale_factor().unwrap_or(1.0);
 
                 #[cfg(target_os = "macos")]

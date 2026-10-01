@@ -156,6 +156,8 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
 
 function MainContainer() {
   const [state, dispatch] = useReducer(panelReducer, DEFAULT_APP_STATE);
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const [isLoaded, setIsLoaded] = useState(false);
   const isFirstMountAfterLoad = useRef(true);
 
@@ -272,6 +274,34 @@ function MainContainer() {
         );
         if (isCancelled) unlistenPause();
         else unlisteners.push(unlistenPause);
+
+        // System tray toggle all visibility
+        const unlistenToggleAllVisibility = await listen(
+          'panel:toggle-all-visibility',
+          () => {
+            const currentState = stateRef.current;
+            const anyVisible = currentState.panels.some((p) => p.visible);
+            const nextVisible = !anyVisible;
+
+            dispatch({ type: 'TOGGLE_ALL_VISIBILITY' });
+
+            for (const panel of currentState.panels) {
+              if (nextVisible) {
+                invoke('open_or_focus_overlay', {
+                  id: panel.id,
+                  x: panel.position.x,
+                  y: panel.position.y,
+                  width: panel.size.width,
+                  height: panel.size.height,
+                }).catch(() => {});
+              } else {
+                invoke('close_overlay', { id: panel.id }).catch(() => {});
+              }
+            }
+          }
+        );
+        if (isCancelled) unlistenToggleAllVisibility();
+        else unlisteners.push(unlistenToggleAllVisibility);
       } catch {
         // Outside Tauri
       }
@@ -309,6 +339,16 @@ function MainContainer() {
       _source: 'main',
     };
     emit('panel:update', payload).catch(() => {});
+
+    if (updated.visible) {
+      invoke('open_or_focus_overlay', {
+        id: updated.id,
+        x: updated.position.x,
+        y: updated.position.y,
+        width: updated.size.width,
+        height: updated.size.height,
+      }).catch(() => {});
+    }
   };
 
   const handleDelete = (id: string) => {

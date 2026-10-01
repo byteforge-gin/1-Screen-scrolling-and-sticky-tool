@@ -21,6 +21,7 @@ export type PanelAction =
   | { type: 'UPDATE_PANEL'; payload: { id: string; changes: Partial<PanelConfig> } }
   | { type: 'REMOVE_PANEL'; payload: { id: string } }
   | { type: 'TOGGLE_VISIBLE'; payload: { id: string } }
+  | { type: 'TOGGLE_ALL_VISIBILITY' }
   | { type: 'TOGGLE_PAUSE'; payload: { id: string } }
   | { type: 'SET_GLOBAL_PAUSE'; payload: boolean }
   | { type: 'TOGGLE_GLOBAL_PAUSE' }
@@ -99,6 +100,18 @@ export function panelReducer(state: AppState, action: PanelAction): AppState {
         ),
       };
 
+    case 'TOGGLE_ALL_VISIBILITY': {
+      const anyVisible = state.panels.some((panel) => panel.visible);
+      const targetVisible = !anyVisible;
+      return {
+        ...state,
+        panels: state.panels.map((panel) => ({
+          ...panel,
+          visible: targetVisible,
+        })),
+      };
+    }
+
     case 'TOGGLE_PAUSE':
       return {
         ...state,
@@ -152,6 +165,10 @@ export function removePanel(id: string): PanelAction {
 
 export function toggleVisible(id: string): PanelAction {
   return { type: 'TOGGLE_VISIBLE', payload: { id } };
+}
+
+export function toggleAllVisibility(): PanelAction {
+  return { type: 'TOGGLE_ALL_VISIBILITY' };
 }
 
 export function togglePause(id: string): PanelAction {

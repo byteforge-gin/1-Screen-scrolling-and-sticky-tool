@@ -1,7 +1,6 @@
 import React from 'react';
 import { PanelConfig } from '../types/panel';
 import { Play, Pause, Trash2, Settings, Eye, EyeOff } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
 
 export interface PanelCardProps {
   panel: PanelConfig;
@@ -50,23 +49,10 @@ export const PanelCard: React.FC<PanelCardProps> = ({
 
   const handleToggleVisible = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const nextVisible = !panel.visible;
-    if (nextVisible) {
-      invoke('open_or_focus_overlay', {
-        id: panel.id,
-        x: panel.position.x,
-        y: panel.position.y,
-        width: panel.size.width,
-        height: panel.size.height,
-      }).catch(() => {});
-    } else {
-      invoke('close_overlay', { id: panel.id }).catch(() => {});
-    }
-
     if (onToggleVisible) {
       onToggleVisible(panel.id);
     } else {
-      onUpdate({ ...panel, visible: nextVisible });
+      onUpdate({ ...panel, visible: !panel.visible });
     }
   };
 

@@ -71,12 +71,33 @@ export function useHashRoute(initialHash?: string): AppRoute {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    // Defensive re-check shortly after mount: on some platforms the Tauri IPC
+    // bridge (window.__TAURI_INTERNALS__) may not be fully initialized at the
+    // very first synchronous script execution, causing getCurrentWebviewWindow()
+    // to throw or return stale data during the initial render. Re-resolving
+    // once after mount corrects the route if the first attempt was wrong.
+    const recheckTimer = setTimeout(() => {
+      setRoute((prev) => {
+        const resolved = resolveCurrentRoute(window.location.hash);
+        if (
+          resolved.type !== prev.type ||
+          (resolved.type === 'overlay' &&
+            prev.type === 'overlay' &&
+            resolved.panelId !== prev.panelId)
+        ) {
+          return resolved;
+        }
+        return prev;
+      });
+    }, 50);
+
     const handleHashChange = () => {
       setRoute(resolveCurrentRoute(window.location.hash));
     };
 
     window.addEventListener('hashchange', handleHashChange);
     return () => {
+      clearTimeout(recheckTimer);
       window.removeEventListener('hashchange', handleHashChange);
     };
   }, []);

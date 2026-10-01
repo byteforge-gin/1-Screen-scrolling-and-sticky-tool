@@ -1,4 +1,4 @@
-import { useReducer, useEffect, useState, useRef, useCallback } from 'react';
+import { useReducer, useEffect, useState, useRef, useCallback, Component, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, emit, type UnlistenFn } from '@tauri-apps/api/event';
 import { panelReducer, DEFAULT_APP_STATE, createDefaultPanel } from './store/panelStore';
@@ -6,6 +6,47 @@ import { AppState, PanelConfig, PanelUpdatePayload } from './types/panel';
 import { MainDashboard } from './components/MainDashboard';
 import { OverlayView } from './components/OverlayView';
 import { useHashRoute } from './router';
+
+/**
+ * Diagnostic error boundary: if any child component throws during render,
+ * show the error visibly in the window instead of silently rendering blank.
+ * This is essential for debugging the packaged production build where no
+ * console/devtools is normally visible to the end user.
+ */
+class OverlayErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div
+          data-testid="overlay-error-boundary"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(127,29,29,0.92)',
+            color: '#fff',
+            fontFamily: 'monospace',
+            fontSize: 11,
+            padding: 12,
+            overflow: 'auto',
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          {`[FATAL] React render threw:\n\n${this.state.error.stack || this.state.error.message}`}
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface OverlayContainerProps {
   panelId: string;
@@ -18,6 +59,7 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
   const [globalPaused, setGlobalPaused] = useState(false);
 
   // Load initial panel data
+  const [loadError, setLoadError] = useState<string | null>(null);
   useEffect(() => {
     let isCancelled = false;
     async function loadOverlay() {
@@ -34,8 +76,10 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
             setGlobalPaused(loaded.globalPaused);
           }
         }
-      } catch {
-        // Outside Tauri or load error
+      } catch (err) {
+        if (!isCancelled) {
+          setLoadError(String((err as Error)?.message || err));
+        }
       } finally {
         if (!isCancelled) {
           setIsLoading(false);
@@ -129,27 +173,40 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
   );
 
   if (isLoading) {
-    return <div data-testid="overlay-loading" className="w-screen h-screen bg-transparent" />;
+    return (
+      <div
+        data-testid="overlay-loading"
+        className="w-screen h-screen bg-black/30 flex items-center justify-center text-[10px] text-white font-mono"
+      >
+        loading panel {panelId}...
+      </div>
+    );
   }
 
   if (!panel) {
     return (
       <div
         data-testid="overlay-unmatched"
-        className="w-screen h-screen bg-transparent flex items-center justify-center text-xs text-slate-500"
+        className="w-screen h-screen bg-black/40 flex flex-col items-center justify-center gap-1 text-xs text-slate-200 font-mono p-2 text-center"
       >
-        面板不存在或已关闭
+        <div>面板不存在或已关闭</div>
+        <div className="text-[10px] text-slate-400 break-all">panelId: {panelId}</div>
+        {loadError && (
+          <div className="text-[10px] text-red-400 break-all">error: {loadError}</div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="w-full h-full overflow-hidden bg-transparent m-0 p-0 select-none">
-      <OverlayView
-        panel={panel}
-        globalPaused={globalPaused}
-        onUpdate={handleUpdate}
-      />
+      <OverlayErrorBoundary>
+        <OverlayView
+          panel={panel}
+          globalPaused={globalPaused}
+          onUpdate={handleUpdate}
+        />
+      </OverlayErrorBoundary>
     </div>
   );
 }

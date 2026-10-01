@@ -532,10 +532,10 @@ describe('OverlayView', () => {
     );
   });
 
-  it('triggers startDragging on background mousedown when hovered, but not on text or controls', () => {
+  it('triggers startDragging on text and container mousedown, but not on interactive controls', () => {
     mockStartDragging.mockClear();
     const panel = createDefaultPanel('拖拽测试');
-    const { rerender } = render(
+    render(
       <OverlayView panel={panel} isHovered={true} onUpdate={() => {}} />
     );
 
@@ -543,27 +543,23 @@ describe('OverlayView', () => {
     const textContent = screen.getByTestId('scroll-content');
     const pauseBtn = screen.getByTestId('toggle-pause-btn');
 
-    // 1. Mousedown on text -> should NOT start dragging
+    // 1. Mousedown on text -> SHOULD start dragging
     fireEvent.mouseDown(textContent, { button: 0 });
-    expect(mockStartDragging).not.toHaveBeenCalled();
+    expect(mockStartDragging).toHaveBeenCalledTimes(1);
 
-    // 2. Mousedown on controls button -> should NOT start dragging from container
+    // 2. Mousedown on controls button -> should NOT start dragging
+    mockStartDragging.mockClear();
     fireEvent.mouseDown(pauseBtn, { button: 0 });
     expect(mockStartDragging).not.toHaveBeenCalled();
 
     // 3. Mousedown on background container -> SHOULD start dragging
+    mockStartDragging.mockClear();
     fireEvent.mouseDown(container, { button: 0 });
     expect(mockStartDragging).toHaveBeenCalledTimes(1);
 
-    // 4. Mousedown on background container with right-click (button 2) -> should NOT start dragging
+    // 4. Mousedown with right-click (button 2) -> should NOT start dragging
     mockStartDragging.mockClear();
     fireEvent.mouseDown(container, { button: 2 });
-    expect(mockStartDragging).not.toHaveBeenCalled();
-
-    // 5. When not hovered -> background mousedown should NOT start dragging
-    rerender(<OverlayView panel={panel} isHovered={false} onUpdate={() => {}} />);
-    mockStartDragging.mockClear();
-    fireEvent.mouseDown(container, { button: 0 });
     expect(mockStartDragging).not.toHaveBeenCalled();
   });
 });

@@ -161,33 +161,21 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
     globalPaused
   );
 
-  const handleDragMouseDown = async (e: React.MouseEvent) => {
-    if (e.button === 0) {
-      try {
-        await getCurrentWebviewWindow().startDragging();
-      } catch {
-        // Ignore outside Tauri
-      }
-    }
-  };
-
-  const handleBackgroundMouseDown = async (e: React.MouseEvent) => {
-    if (e.button !== 0 || !effectiveHover) {
+  const handlePanelMouseDown = async (e: React.MouseEvent) => {
+    if (e.button !== 0) {
       return;
     }
 
     const target = e.target as HTMLElement;
 
-    // Do not trigger background drag if clicking on text or controls
+    // Do not trigger window drag if clicking on interactive controls
     if (
-      target.closest('[data-testid="scroll-content"]') ||
-      target.closest('[data-testid="overlay-controls"]') ||
-      target.closest('[data-testid="quick-edit-popover"]') ||
-      target.closest('[data-direction]') ||
       target.closest('button') ||
       target.closest('input') ||
       target.closest('textarea') ||
-      target.closest('select')
+      target.closest('select') ||
+      target.closest('[data-testid="quick-edit-popover"]') ||
+      target.closest('[data-direction]')
     ) {
       return;
     }
@@ -255,29 +243,30 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
     <div
       ref={containerRef}
       data-testid="overlay-container"
+      data-tauri-drag-region
       onMouseEnter={() => setInternalHover(true)}
       onMouseLeave={() => setInternalHover(false)}
-      onMouseDown={handleBackgroundMouseDown}
+      onMouseDown={handlePanelMouseDown}
       style={{
         backgroundColor: hexToRgba(panel.style.bgColor, panel.style.bgOpacity),
         width: '100%',
         height: '100%',
       }}
       className={`relative w-full h-full select-none transition-colors duration-150 ${
-        effectiveHover ? 'border-2 border-sky-400/80 shadow-lg' : 'border-2 border-transparent'
+        effectiveHover ? 'border-2 border-sky-400/80 shadow-lg cursor-move' : 'border-2 border-transparent'
       }`}
     >
       {/* Hover Controls Top Bar */}
       {effectiveHover && (
         <div
           data-testid="overlay-controls"
-          className="absolute top-1 left-1 right-1 z-40 flex items-center justify-between px-2 py-1 bg-slate-900/85 backdrop-blur text-white rounded shadow text-xs border border-slate-700/60"
+          data-tauri-drag-region
+          className="absolute top-1 left-1 right-1 z-40 flex items-center justify-between px-2 py-1 bg-slate-900/85 backdrop-blur text-white rounded shadow text-xs border border-slate-700/60 cursor-move"
         >
           {/* Drag Handle */}
           <div
             data-testid="drag-handle"
             data-tauri-drag-region
-            onMouseDown={handleDragMouseDown}
             className="flex items-center gap-1 cursor-grab active:cursor-grabbing text-slate-300 hover:text-white px-1 py-0.5 rounded hover:bg-slate-800"
             title="按住拖拽窗口"
           >
@@ -293,7 +282,7 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
               data-testid="toggle-pause-btn"
               onClick={handleTogglePause}
               aria-label={isPaused ? '播放' : '暂停'}
-              className="p-1 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors"
+              className="p-1 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
               title={isPaused ? '恢复滚动' : '暂停滚动'}
             >
               {isPaused ? <Play className="w-3.5 h-3.5 fill-current" /> : <Pause className="w-3.5 h-3.5 fill-current" />}
@@ -305,7 +294,7 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
               data-testid="font-size-plus"
               onClick={handleIncreaseFontSize}
               aria-label="增大字号"
-              className="p-1 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors"
+              className="p-1 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
               title="增大字号 (+2px)"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -317,7 +306,7 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
               data-testid="font-size-minus"
               onClick={handleDecreaseFontSize}
               aria-label="减小字号"
-              className="p-1 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors"
+              className="p-1 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
               title="减小字号 (-2px)"
             >
               <Minus className="w-3.5 h-3.5" />
@@ -329,7 +318,7 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
               data-testid="quick-edit-btn"
               onClick={handleToggleQuickEdit}
               aria-label="快速编辑"
-              className={`p-1 rounded transition-colors ${
+              className={`p-1 rounded transition-colors cursor-pointer ${
                 isQuickEditOpen
                   ? 'bg-sky-500 text-white'
                   : 'hover:bg-slate-800 text-slate-300 hover:text-white'
@@ -357,7 +346,10 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
       {/* Text / Scrolling Content Viewport */}
       <div
         data-testid="scroll-viewport"
-        className={`w-full h-full overflow-hidden pointer-events-none p-2 flex ${
+        data-tauri-drag-region
+        className={`w-full h-full overflow-hidden p-2 flex ${
+          effectiveHover ? 'cursor-move' : ''
+        } ${
           panel.scroll.mode === 'horizontal'
             ? 'justify-start items-center'
             : panel.scroll.mode === 'vertical'
@@ -368,7 +360,8 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
         <div
           ref={contentRef}
           data-testid="scroll-content"
-          className="pointer-events-auto"
+          data-tauri-drag-region
+          className={`pointer-events-auto ${effectiveHover ? 'cursor-move' : ''}`}
           style={{
             transform: getTransform(),
             whiteSpace: isHorizontal ? 'nowrap' : 'pre-wrap',

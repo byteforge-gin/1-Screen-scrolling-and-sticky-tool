@@ -1,3 +1,4 @@
+use tauri::webview::Color;
 use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub fn open_or_focus_overlay(
@@ -19,10 +20,11 @@ pub fn open_or_focus_overlay(
             .map_err(|e| e.to_string())?;
         window.set_focus().map_err(|e| e.to_string())?;
     } else {
-        let url = WebviewUrl::App(format!("/#/overlay/{}", id).into());
+        let url = WebviewUrl::App(format!("index.html#/overlay/{}", id).into());
         WebviewWindowBuilder::new(app, &label, url)
             .title(format!("Overlay {}", id))
             .transparent(true)
+            .background_color(Color(0, 0, 0, 0))
             .decorations(false)
             .always_on_top(true)
             .skip_taskbar(true)

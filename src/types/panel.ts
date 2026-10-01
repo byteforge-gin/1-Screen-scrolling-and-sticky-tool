@@ -37,6 +37,10 @@ export interface PanelConfig {
   visible: boolean;
 }
 
+export interface PanelUpdatePayload extends PanelConfig {
+  _source?: string;
+}
+
 export interface AppState {
   panels: PanelConfig[];
   globalPaused: boolean;

@@ -29,11 +29,6 @@ vi.mock('@tauri-apps/api/event', () => ({
   }),
 }));
 
-function emitMockTauriEvent(eventName: string, payload: any) {
-  const handlers = mockListeners.get(eventName) || [];
-  handlers.forEach((fn) => fn({ payload }));
-}
-
 describe('OverlayView', () => {
   it('renders panel text with custom styling', () => {
     const panel = createDefaultPanel('Test');
@@ -458,29 +453,23 @@ describe('OverlayView', () => {
     expect(contentNone.style.width).toBe('100%');
   });
 
-  it('wires panel:update Tauri event listener to invoke onUpdate', async () => {
+  it('updates rendered content dynamically when panel prop changes', () => {
     const panel = createDefaultPanel('Test');
-    const onUpdate = vi.fn();
-    render(<OverlayView panel={panel} onUpdate={onUpdate} />);
-
-    await act(async () => {
-      await Promise.resolve();
-    });
+    panel.text = '原始内容';
+    const { rerender } = render(<OverlayView panel={panel} onUpdate={vi.fn()} />);
+    expect(screen.getByText('原始内容')).toBeInTheDocument();
 
     const updatedPanel: PanelConfig = {
       ...panel,
-      text: 'Synchronized from dashboard',
+      text: '通过属性同步更新后的内容',
       style: {
         ...panel.style,
         fontSize: 36,
       },
     };
 
-    await act(async () => {
-      emitMockTauriEvent('panel:update', updatedPanel);
-    });
-
-    expect(onUpdate).toHaveBeenCalledWith(updatedPanel);
+    rerender(<OverlayView panel={updatedPanel} onUpdate={vi.fn()} />);
+    expect(screen.getByText('通过属性同步更新后的内容')).toBeInTheDocument();
   });
 
   it('popover is scrollable for small windows and form inputs have select-text', () => {

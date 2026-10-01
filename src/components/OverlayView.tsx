@@ -107,35 +107,6 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
     };
   }, [panel.id]);
 
-  // Listen to Tauri event `panel:update` if running in Tauri environment
-  useEffect(() => {
-    let unlisten: UnlistenFn | undefined;
-    let isCancelled = false;
-
-    listen<PanelConfig>('panel:update', (event) => {
-      if (event.payload.id === panel.id) {
-        onUpdate(event.payload);
-      }
-    })
-      .then((fn) => {
-        if (isCancelled) {
-          fn();
-        } else {
-          unlisten = fn;
-        }
-      })
-      .catch(() => {
-        // Tauri events not available in pure browser/test mode
-      });
-
-    return () => {
-      isCancelled = true;
-      if (unlisten) {
-        unlisten();
-      }
-    };
-  }, [panel.id, onUpdate]);
-
   // Measure container and content sizes
   useEffect(() => {
     const updateDimensions = () => {

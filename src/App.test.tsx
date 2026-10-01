@@ -185,6 +185,70 @@ describe('App & Router Integration', () => {
     expect(screen.getByTestId('global-pause-btn')).toHaveTextContent(/全部继续|全部恢复/);
   });
 
+  it('prevents self-cancelling double-dispatch when global pause is clicked in MainDashboard', async () => {
+    window.location.hash = '#/';
+    mockInvoke.mockResolvedValue({
+      panels: [],
+      globalPaused: false,
+      hotkey: 'Ctrl+Alt+Space',
+    });
+
+    render(<App />);
+    const pauseBtn = await screen.findByTestId('global-pause-btn');
+    expect(pauseBtn).toHaveTextContent(/全部暂停/);
+
+    // Click global pause in UI
+    act(() => {
+      fireEvent.click(pauseBtn);
+    });
+
+    // Verify emit was called with { source: 'main_user' }
+    expect(mockEmit).toHaveBeenCalledWith('panel:toggle-global-pause', { source: 'main_user' });
+
+    // Should stay paused (not self-cancelled)
+    expect(pauseBtn).toHaveTextContent(/全部继续|全部恢复/);
+
+    // Simulate Tauri broadcasting the event back to the emitting window
+    act(() => {
+      triggerMockTauriEvent('panel:toggle-global-pause', { source: 'main_user' });
+    });
+
+    // Should STILL stay paused (ignored self-echo)
+    expect(pauseBtn).toHaveTextContent(/全部继续|全部恢复/);
+  });
+
+  it('ignores self-echoed panel:update events in MainContainer', async () => {
+    window.location.hash = '#/';
+    const panel = createDefaultPanel('主窗口自回响测试');
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'load_panels') {
+        return Promise.resolve({
+          panels: [panel],
+          globalPaused: false,
+          hotkey: 'Ctrl+Alt+Space',
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    render(<App />);
+    expect(await screen.findByText('主窗口自回响测试')).toBeInTheDocument();
+
+    // Receiving self-echo tagged with _source: 'main' should not trigger an update
+    act(() => {
+      triggerMockTauriEvent('panel:update', {
+        ...panel,
+        name: '回响被忽略',
+        _source: 'main',
+      });
+    });
+
+    // The name should remain original, not changed to '回响被忽略'
+    expect(screen.queryByText('回响被忽略')).not.toBeInTheDocument();
+    expect(screen.getByText('主窗口自回响测试')).toBeInTheDocument();
+  });
+
   it('renders OverlayView when hash matches #/overlay/:id and panel exists', async () => {
     const panel = createDefaultPanel('悬浮窗台词');
     panel.id = 'panel-test-123';
@@ -257,11 +321,26 @@ describe('App & Router Integration', () => {
       'panel:update',
       expect.objectContaining({
         id: panel.id,
+        _source: `overlay_${panel.id}`,
         style: expect.objectContaining({
           fontSize: panel.style.fontSize + 2,
         }),
       })
     );
+
+    // Verify panel:sync-rect is NOT redundantly emitted
+    expect(mockEmit).not.toHaveBeenCalledWith('panel:sync-rect', expect.anything());
+
+    // Verify self-echo is ignored by OverlayContainer listener
+    act(() => {
+      triggerMockTauriEvent('panel:update', {
+        ...panel,
+        text: '回显应被忽略',
+        _source: `overlay_${panel.id}`,
+      });
+    });
+
+    expect(screen.queryByText('回显应被忽略')).not.toBeInTheDocument();
   });
 
   it('switches views dynamically on window hashchange', async () => {

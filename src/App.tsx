@@ -2,7 +2,7 @@ import { useReducer, useEffect, useState, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, emit, type UnlistenFn } from '@tauri-apps/api/event';
 import { panelReducer, DEFAULT_APP_STATE, createDefaultPanel } from './store/panelStore';
-import { AppState, PanelConfig } from './types/panel';
+import { AppState, PanelConfig, PanelUpdatePayload } from './types/panel';
 import { MainDashboard } from './components/MainDashboard';
 import { OverlayView } from './components/OverlayView';
 import { useHashRoute } from './router';
@@ -13,6 +13,7 @@ interface OverlayContainerProps {
 
 function OverlayContainer({ panelId }: OverlayContainerProps) {
   const [panel, setPanel] = useState<PanelConfig | null>(null);
+  const panelRef = useRef<PanelConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [globalPaused, setGlobalPaused] = useState(false);
 
@@ -26,6 +27,7 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
         if (loaded && Array.isArray(loaded.panels)) {
           const found = loaded.panels.find((p) => p.id === panelId);
           if (found) {
+            panelRef.current = found;
             setPanel(found);
           }
           if (typeof loaded.globalPaused === 'boolean') {
@@ -53,10 +55,15 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
 
     async function registerListeners() {
       try {
-        const unlistenUpdate = await listen<PanelConfig>('panel:update', (event) => {
-          if (event.payload && event.payload.id === panelId) {
-            setPanel(event.payload);
+        const unlistenUpdate = await listen<PanelUpdatePayload>('panel:update', (event) => {
+          const payload = event.payload;
+          if (!payload || payload.id !== panelId) return;
+          // Ignore self-echoes from this overlay window
+          if (payload._source === `overlay_${panelId}`) {
+            return;
           }
+          panelRef.current = payload;
+          setPanel(payload);
         });
         if (isCancelled) unlistenUpdate();
         else unlisteners.push(unlistenUpdate);
@@ -75,11 +82,13 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
           if (event.payload && event.payload.id === panelId) {
             setPanel((prev) => {
               if (!prev) return prev;
-              return {
+              const next = {
                 ...prev,
                 position: event.payload.position ?? prev.position,
                 size: event.payload.size ?? prev.size,
               };
+              panelRef.current = next;
+              return next;
             });
           }
         });
@@ -100,15 +109,23 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
 
   const handleUpdate = useCallback(
     (updated: PanelConfig) => {
+      // Check if changes actually occurred to avoid re-triggering updates
+      const currentSerialized = panelRef.current ? JSON.stringify(panelRef.current) : '';
+      const updatedSerialized = JSON.stringify(updated);
+      if (currentSerialized === updatedSerialized) {
+        return;
+      }
+
+      panelRef.current = updated;
       setPanel(updated);
-      emit('panel:update', updated).catch(() => {});
-      emit('panel:sync-rect', {
-        id: updated.id,
-        position: updated.position,
-        size: updated.size,
-      }).catch(() => {});
+
+      const payload: PanelUpdatePayload = {
+        ...updated,
+        _source: `overlay_${panelId}`,
+      };
+      emit('panel:update', payload).catch(() => {});
     },
-    []
+    [panelId]
   );
 
   if (isLoading) {
@@ -199,14 +216,17 @@ function MainContainer() {
     async function registerListeners() {
       try {
         // Overlay modified panel (quick edit, font size, resize)
-        const unlistenUpdate = await listen<PanelConfig>('panel:update', (event) => {
+        const unlistenUpdate = await listen<PanelUpdatePayload>('panel:update', (event) => {
           const payload = event.payload;
-          if (payload && payload.id) {
-            dispatch({
-              type: 'UPDATE_PANEL',
-              payload: { id: payload.id, changes: payload },
-            });
+          if (!payload || !payload.id) return;
+          // Ignore self-echoes from main window
+          if (payload._source === 'main') {
+            return;
           }
+          dispatch({
+            type: 'UPDATE_PANEL',
+            payload: { id: payload.id, changes: payload },
+          });
         });
         if (isCancelled) unlistenUpdate();
         else unlisteners.push(unlistenUpdate);
@@ -241,9 +261,15 @@ function MainContainer() {
         else unlisteners.push(unlistenSyncRect);
 
         // Global hotkey or system tray toggle
-        const unlistenPause = await listen('panel:toggle-global-pause', () => {
-          dispatch({ type: 'TOGGLE_GLOBAL_PAUSE' });
-        });
+        const unlistenPause = await listen<{ source?: string }>(
+          'panel:toggle-global-pause',
+          (event) => {
+            // Ignore self-echo when triggered by main user button click
+            if (event.payload?.source !== 'main_user') {
+              dispatch({ type: 'TOGGLE_GLOBAL_PAUSE' });
+            }
+          }
+        );
         if (isCancelled) unlistenPause();
         else unlisteners.push(unlistenPause);
       } catch {
@@ -278,7 +304,11 @@ function MainContainer() {
       type: 'UPDATE_PANEL',
       payload: { id: updated.id, changes: updated },
     });
-    emit('panel:update', updated).catch(() => {});
+    const payload: PanelUpdatePayload = {
+      ...updated,
+      _source: 'main',
+    };
+    emit('panel:update', payload).catch(() => {});
   };
 
   const handleDelete = (id: string) => {
@@ -307,19 +337,24 @@ function MainContainer() {
   const handleTogglePause = (id: string) => {
     const panel = state.panels.find((p) => p.id === id);
     if (!panel) return;
-    dispatch({ type: 'TOGGLE_PAUSE', payload: { id } });
-    emit('panel:update', {
+    const updated = {
       ...panel,
       scroll: {
         ...panel.scroll,
         paused: !panel.scroll.paused,
       },
-    }).catch(() => {});
+    };
+    dispatch({ type: 'TOGGLE_PAUSE', payload: { id } });
+    const payload: PanelUpdatePayload = {
+      ...updated,
+      _source: 'main',
+    };
+    emit('panel:update', payload).catch(() => {});
   };
 
   const handleToggleGlobalPause = () => {
     dispatch({ type: 'TOGGLE_GLOBAL_PAUSE' });
-    emit('panel:toggle-global-pause', {}).catch(() => {});
+    emit('panel:toggle-global-pause', { source: 'main_user' }).catch(() => {});
   };
 
   return (

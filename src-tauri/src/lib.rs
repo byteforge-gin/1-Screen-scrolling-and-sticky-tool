@@ -13,13 +13,11 @@ use tauri::Emitter;
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .build(),
+            )?;
             app.handle().plugin(tauri_plugin_global_shortcut::Builder::new().build())?;
             cursor_poller::start_cursor_polling(app.handle().clone());
             tray::setup_system_tray(app.handle())?;

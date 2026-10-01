@@ -294,8 +294,10 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
         width: '100%',
         height: '100%',
       }}
-      className={`relative w-full h-full select-none transition-colors duration-150 ${
-        effectiveHover ? 'border-2 border-sky-400/80 shadow-lg cursor-move' : 'border-2 border-transparent'
+      className={`relative w-full h-full rounded-lg select-none transition-colors duration-150 ${
+        effectiveHover
+          ? 'border-2 border-sky-400 shadow-xl cursor-move'
+          : 'border-2 border-sky-400/40 shadow-md'
       }`}
     >
       {/* Hover Controls Top Bar */}
@@ -412,14 +414,16 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
             fontWeight: panel.style.fontWeight,
             fontStyle: panel.style.fontStyle,
             textAlign: panel.style.textAlign,
-            textShadow: panel.style.textShadow ? '0 2px 4px rgba(0, 0, 0, 0.8)' : 'none',
+            textShadow: panel.style.textShadow
+              ? '0 2px 4px rgba(0, 0, 0, 0.8), 0 0 2px rgba(0, 0, 0, 0.9)'
+              : '0 1px 3px rgba(0, 0, 0, 0.7)',
             display: isHorizontal ? 'inline-block' : 'block',
             width: isHorizontal ? 'auto' : '100%',
             maxWidth: isHorizontal ? 'none' : '100%',
             willChange: panel.scroll.mode === 'none' ? 'auto' : 'transform',
           }}
         >
-          {panel.text}
+          {panel.text || '欢迎使用屏幕滚动便签'}
         </div>
       </div>
     </div>

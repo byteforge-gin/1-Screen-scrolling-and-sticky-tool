@@ -236,7 +236,9 @@ function MainContainer() {
                 y: panel.position.y,
                 width: panel.size.width,
                 height: panel.size.height,
-              }).catch(() => {});
+              }).catch((err) => {
+                alert(`自动启动字幕窗口失败 (${panel.name}): ${err}`);
+              });
             }
           }
         }
@@ -387,7 +389,9 @@ function MainContainer() {
         y: newPanel.position.y,
         width: newPanel.size.width,
         height: newPanel.size.height,
-      }).catch(() => {});
+      }).catch((err) => {
+        alert(`新建字幕窗口失败 (${newPanel.name}): ${err}`);
+      });
     }
   };
 
@@ -409,13 +413,17 @@ function MainContainer() {
         y: updated.position.y,
         width: updated.size.width,
         height: updated.size.height,
-      }).catch(() => {});
+      }).catch((err) => {
+        alert(`更新字幕窗口失败 (${updated.name}): ${err}`);
+      });
     }
   };
 
   const handleDelete = (id: string) => {
     dispatch({ type: 'REMOVE_PANEL', payload: { id } });
-    invoke('close_overlay', { id }).catch(() => {});
+    invoke('close_overlay', { id }).catch((err) => {
+      alert(`关闭字幕窗口失败: ${err}`);
+    });
   };
 
   const handleToggleVisible = (id: string) => {
@@ -430,9 +438,13 @@ function MainContainer() {
         y: panel.position.y,
         width: panel.size.width,
         height: panel.size.height,
-      }).catch(() => {});
+      }).catch((err) => {
+        alert(`显示字幕窗口失败 (${panel.name}): ${err}`);
+      });
     } else {
-      invoke('close_overlay', { id: panel.id }).catch(() => {});
+      invoke('close_overlay', { id: panel.id }).catch((err) => {
+        alert(`隐藏字幕窗口失败 (${panel.name}): ${err}`);
+      });
     }
   };
 

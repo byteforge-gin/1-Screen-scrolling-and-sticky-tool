@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { PanelConfig, PanelScroll } from '../types/panel';
 import { X } from 'lucide-react';
 
@@ -19,7 +20,6 @@ export const QuickEditPopover: React.FC<QuickEditPopoverProps> = ({
 
     async function setCursorLock(ignore: boolean) {
       try {
-        const { invoke } = await import('@tauri-apps/api/core');
         if (!isCancelled) {
           await invoke('set_overlay_ignore_cursor', { id: panel.id, ignore });
         }

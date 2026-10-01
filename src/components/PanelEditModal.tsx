@@ -26,7 +26,39 @@ export const PanelEditModal: React.FC<PanelEditModalProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    const clampedWidth = Math.max(100, isNaN(formData.size.width) ? 100 : formData.size.width);
+    const clampedHeight = Math.max(40, isNaN(formData.size.height) ? 40 : formData.size.height);
+    const clampedFontSize = Math.min(
+      200,
+      Math.max(12, isNaN(formData.style.fontSize) ? 24 : formData.style.fontSize)
+    );
+    const clampedSpeed = Math.min(
+      500,
+      Math.max(1, isNaN(formData.scroll.speed) ? 50 : formData.scroll.speed)
+    );
+    const clampedBgOpacity = Math.min(
+      1,
+      Math.max(0, isNaN(formData.style.bgOpacity) ? 0.5 : formData.style.bgOpacity)
+    );
+    const clampedX = isNaN(formData.position.x) ? 0 : formData.position.x;
+    const clampedY = isNaN(formData.position.y) ? 0 : formData.position.y;
+
+    const validatedData: PanelConfig = {
+      ...formData,
+      position: { x: clampedX, y: clampedY },
+      size: { width: clampedWidth, height: clampedHeight },
+      style: {
+        ...formData.style,
+        fontSize: clampedFontSize,
+        bgOpacity: clampedBgOpacity,
+      },
+      scroll: {
+        ...formData.scroll,
+        speed: clampedSpeed,
+      },
+    };
+
+    onSave(validatedData);
   };
 
   const previewBg = hexToRgba(formData.style.bgColor, formData.style.bgOpacity);
@@ -56,7 +88,7 @@ export const PanelEditModal: React.FC<PanelEditModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="flex flex-col gap-6">
+        <form onSubmit={handleSave} noValidate className="flex flex-col gap-6">
           {/* Live Preview Box */}
           <div className="flex flex-col gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">

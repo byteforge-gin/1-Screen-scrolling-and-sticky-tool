@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { PanelConfig } from '../types/panel';
 
 export type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se';
@@ -64,7 +65,6 @@ async function syncTauriWindow(width: number, height: number, x: number, y: numb
 
 async function setIgnoreCursor(id: string, ignore: boolean) {
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
     await invoke('set_overlay_ignore_cursor', { id, ignore });
   } catch {
     // Ignore outside Tauri

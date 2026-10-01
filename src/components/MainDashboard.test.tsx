@@ -357,4 +357,40 @@ describe('MainDashboard', () => {
     expect(onUpdate).not.toHaveBeenCalled();
     expect(screen.queryByTestId('panel-edit-modal')).not.toBeInTheDocument();
   });
+
+  it('clamps numeric inputs to valid ranges on save in PanelEditModal', () => {
+    const p = createDefaultPanel('数值校验面板');
+    const onUpdate = vi.fn();
+
+    render(
+      <MainDashboard
+        panels={[p]}
+        onAdd={vi.fn()}
+        onUpdate={onUpdate}
+        onDelete={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId(`edit-panel-${p.id}`));
+
+    // Enter out-of-range values: width: 50 (< 100), height: 10 (< 40), fontSize: 500 (> 200), speed: 999 (> 500)
+    fireEvent.change(screen.getByTestId('modal-input-width'), { target: { value: '50' } });
+    fireEvent.change(screen.getByTestId('modal-input-height'), { target: { value: '10' } });
+    fireEvent.change(screen.getByTestId('modal-input-fontsize'), { target: { value: '500' } });
+    fireEvent.change(screen.getByTestId('modal-input-speed'), { target: { value: '999' } });
+
+    fireEvent.click(screen.getByTestId('modal-btn-save'));
+
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        size: { width: 100, height: 40 },
+        style: expect.objectContaining({
+          fontSize: 200,
+        }),
+        scroll: expect.objectContaining({
+          speed: 500,
+        }),
+      })
+    );
+  });
 });

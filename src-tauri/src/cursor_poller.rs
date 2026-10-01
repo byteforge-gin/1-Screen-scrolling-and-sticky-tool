@@ -223,16 +223,8 @@ pub fn poll_cursor_tick(app: &AppHandle) {
         state.retain_active_windows(&active_ids);
     }
 
-    // Apply updates outside the lock to avoid holding the mutex during OS IPC and event emitting
-    for (id, window, is_hovered) in updates {
-        let ignore_cursor = !is_hovered;
-        if let Err(e) = window.set_ignore_cursor_events(ignore_cursor) {
-            log::warn!(
-                "Failed to set ignore_cursor_events for overlay {}: {}",
-                id,
-                e
-            );
-        }
+    // Apply updates outside the lock to avoid holding the mutex during event emitting
+    for (id, _window, is_hovered) in updates {
         if let Err(e) = app.emit(
             "overlay:hover-state",
             HoverStatePayload {

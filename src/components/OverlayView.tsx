@@ -6,6 +6,7 @@ import { QuickEditPopover } from './QuickEditPopover';
 import { GripHorizontal, Play, Pause, Plus, Minus, Pencil } from 'lucide-react';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { LogicalPosition } from '@tauri-apps/api/dpi';
 
 export interface OverlayViewProps {
   panel: PanelConfig;
@@ -158,10 +159,11 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
     panel.scroll,
     containerSize,
     contentSize,
-    globalPaused
+    globalPaused,
+    0
   );
 
-  const handlePanelMouseDown = async (e: React.MouseEvent) => {
+  const handlePanelMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) {
       return;
     }
@@ -180,11 +182,51 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
       return;
     }
 
+    // Try native OS drag
     try {
-      await getCurrentWebviewWindow().startDragging();
+      void getCurrentWebviewWindow().startDragging();
     } catch {
       // Ignore outside Tauri
     }
+
+    // Direct pointer tracking drag fallback (especially robust for Windows WebView2)
+    const startScreenX = e.screenX || e.clientX;
+    const startScreenY = e.screenY || e.clientY;
+    const startPosX = panel.position.x;
+    const startPosY = panel.position.y;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault();
+      const currentX = moveEvent.screenX || moveEvent.clientX;
+      const currentY = moveEvent.screenY || moveEvent.clientY;
+      const deltaX = currentX - startScreenX;
+      const deltaY = currentY - startScreenY;
+
+      if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+        const newX = startPosX + deltaX;
+        const newY = startPosY + deltaY;
+
+        try {
+          const win = getCurrentWebviewWindow();
+          void win.setPosition(new LogicalPosition(newX, newY));
+        } catch {
+          // Ignore outside Tauri
+        }
+
+        onUpdate({
+          ...panel,
+          position: { x: newX, y: newY },
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
   };
 
   const handleTogglePause = (e: React.MouseEvent) => {

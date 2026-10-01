@@ -10,10 +10,15 @@ on:
         description: '可选：手动触发时给产物起的 tag 名（留空则只上传 artifact，不创建 Release）'
         required: false
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     name: Build Windows Application
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     env:
       APP_NAME: 'screen-scroller-sticky-tool'

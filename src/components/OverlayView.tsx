@@ -107,6 +107,35 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
     };
   }, [panel.id]);
 
+  // Listen to Tauri event `panel:update` if running in Tauri environment
+  useEffect(() => {
+    let unlisten: UnlistenFn | undefined;
+    let isCancelled = false;
+
+    listen<PanelConfig>('panel:update', (event) => {
+      if (event.payload.id === panel.id) {
+        onUpdate(event.payload);
+      }
+    })
+      .then((fn) => {
+        if (isCancelled) {
+          fn();
+        } else {
+          unlisten = fn;
+        }
+      })
+      .catch(() => {
+        // Tauri events not available in pure browser/test mode
+      });
+
+    return () => {
+      isCancelled = true;
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, [panel.id, onUpdate]);
+
   // Measure container and content sizes
   useEffect(() => {
     const updateDimensions = () => {
@@ -233,7 +262,7 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
         width: '100%',
         height: '100%',
       }}
-      className={`relative w-full h-full overflow-hidden select-none transition-colors duration-150 ${
+      className={`relative w-full h-full select-none transition-colors duration-150 ${
         effectiveHover ? 'border-2 border-sky-400/80 shadow-lg' : 'border-2 border-transparent'
       }`}
     >
@@ -325,7 +354,16 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
       )}
 
       {/* Text / Scrolling Content Viewport */}
-      <div className="w-full h-full flex items-center justify-center pointer-events-none p-2">
+      <div
+        data-testid="scroll-viewport"
+        className={`w-full h-full overflow-hidden pointer-events-none p-2 flex ${
+          panel.scroll.mode === 'horizontal'
+            ? 'justify-start items-center'
+            : panel.scroll.mode === 'vertical'
+              ? 'items-start justify-start w-full'
+              : 'items-center justify-start w-full'
+        }`}
+      >
         <div
           ref={contentRef}
           data-testid="scroll-content"
@@ -338,7 +376,8 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
             fontStyle: panel.style.fontStyle,
             textAlign: panel.style.textAlign,
             textShadow: panel.style.textShadow ? '0 2px 4px rgba(0, 0, 0, 0.8)' : 'none',
-            display: 'inline-block',
+            display: isHorizontal ? 'inline-block' : 'block',
+            width: isHorizontal ? 'auto' : '100%',
             maxWidth: isHorizontal ? 'none' : '100%',
             willChange: panel.scroll.mode === 'none' ? 'auto' : 'transform',
           }}

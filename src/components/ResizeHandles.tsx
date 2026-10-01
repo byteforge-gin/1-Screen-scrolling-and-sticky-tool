@@ -82,8 +82,8 @@ export const ResizeHandles: React.FC<ResizeHandlesProps> = ({
       e.preventDefault();
       e.stopPropagation();
 
-      const startX = e.clientX;
-      const startY = e.clientY;
+      const startX = e.screenX || e.clientX;
+      const startY = e.screenY || e.clientY;
       const startWidth = panel.size.width;
       const startHeight = panel.size.height;
       const startPosX = panel.position.x;
@@ -93,8 +93,10 @@ export const ResizeHandles: React.FC<ResizeHandlesProps> = ({
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         moveEvent.preventDefault();
-        const deltaX = moveEvent.clientX - startX;
-        const deltaY = moveEvent.clientY - startY;
+        const currentScreenX = moveEvent.screenX || moveEvent.clientX;
+        const currentScreenY = moveEvent.screenY || moveEvent.clientY;
+        const deltaX = currentScreenX - startX;
+        const deltaY = currentScreenY - startY;
 
         let newWidth = startWidth;
         let newHeight = startHeight;

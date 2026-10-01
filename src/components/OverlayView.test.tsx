@@ -5,16 +5,34 @@ import { createDefaultPanel } from '../store/panelStore';
 import { PanelConfig } from '../types/panel';
 
 let eventHandler: ((event: { payload: { id: string; isHovered: boolean } }) => void) | null = null;
+const mockListeners = new Map<string, Array<(event: any) => void>>();
+
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn((eventName: string, handler: any) => {
     if (eventName === 'overlay:hover-state') {
       eventHandler = handler;
     }
+    const current = mockListeners.get(eventName) || [];
+    current.push(handler);
+    mockListeners.set(eventName, current);
+
     return Promise.resolve(() => {
-      eventHandler = null;
+      if (eventName === 'overlay:hover-state') {
+        eventHandler = null;
+      }
+      const updated = mockListeners.get(eventName) || [];
+      mockListeners.set(
+        eventName,
+        updated.filter((fn) => fn !== handler)
+      );
     });
   }),
 }));
+
+function emitMockTauriEvent(eventName: string, payload: any) {
+  const handlers = mockListeners.get(eventName) || [];
+  handlers.forEach((fn) => fn({ payload }));
+}
 
 describe('OverlayView', () => {
   it('renders panel text with custom styling', () => {
@@ -404,5 +422,115 @@ describe('OverlayView', () => {
     );
     const toggleBtn = screen.getByTestId('toggle-pause-btn');
     expect(toggleBtn).toHaveAttribute('aria-label', '播放');
+  });
+
+  it('anchors layout properly: horizontal starts at left, vertical starts at top, none has full width', () => {
+    // 1. Horizontal mode
+    const panelH = createDefaultPanel('H');
+    panelH.scroll.mode = 'horizontal';
+    const { rerender } = render(<OverlayView panel={panelH} isHovered={false} onUpdate={() => {}} />);
+    const viewportH = screen.getByTestId('scroll-viewport');
+    expect(viewportH.className).toContain('justify-start');
+    expect(viewportH.className).toContain('items-center');
+    expect(viewportH.className).toContain('overflow-hidden');
+
+    // Root overlay should NOT have overflow-hidden (controls and popover must be visible)
+    const overlayRoot = viewportH.parentElement as HTMLElement;
+    expect(overlayRoot.className).not.toContain('overflow-hidden');
+
+    // 2. Vertical mode
+    const panelV = createDefaultPanel('V');
+    panelV.scroll.mode = 'vertical';
+    rerender(<OverlayView panel={panelV} isHovered={false} onUpdate={() => {}} />);
+    const viewportV = screen.getByTestId('scroll-viewport');
+    expect(viewportV.className).toContain('items-start');
+    expect(viewportV.className).toContain('justify-start');
+    const contentV = screen.getByTestId('scroll-content');
+    expect(contentV.style.width).toBe('100%');
+
+    // 3. None mode with right align
+    const panelNone = createDefaultPanel('None');
+    panelNone.scroll.mode = 'none';
+    panelNone.style.textAlign = 'right';
+    rerender(<OverlayView panel={panelNone} isHovered={false} onUpdate={() => {}} />);
+    const contentNone = screen.getByTestId('scroll-content');
+    expect(contentNone.style.textAlign).toBe('right');
+    expect(contentNone.style.width).toBe('100%');
+  });
+
+  it('wires panel:update Tauri event listener to invoke onUpdate', async () => {
+    const panel = createDefaultPanel('Test');
+    const onUpdate = vi.fn();
+    render(<OverlayView panel={panel} onUpdate={onUpdate} />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const updatedPanel: PanelConfig = {
+      ...panel,
+      text: 'Synchronized from dashboard',
+      style: {
+        ...panel.style,
+        fontSize: 36,
+      },
+    };
+
+    await act(async () => {
+      emitMockTauriEvent('panel:update', updatedPanel);
+    });
+
+    expect(onUpdate).toHaveBeenCalledWith(updatedPanel);
+  });
+
+  it('popover is scrollable for small windows and form inputs have select-text', () => {
+    const panel = createDefaultPanel('Test');
+    render(<OverlayView panel={panel} isHovered={true} onUpdate={() => {}} />);
+
+    // Open popover
+    fireEvent.click(screen.getByTestId('quick-edit-btn'));
+
+    const popover = screen.getByTestId('quick-edit-popover');
+    expect(popover.className).toContain('overflow-y-auto');
+    expect(popover.className).toContain('max-h-');
+
+    const textInput = screen.getByTestId('edit-text-input');
+    expect(textInput.className).toContain('select-text');
+
+    const fontSizeInput = screen.getByTestId('edit-font-size-input');
+    expect(fontSizeInput.className).toContain('select-text');
+  });
+
+  it('uses screenX and screenY during resize to prevent jitter when window origin moves', () => {
+    const panel = createDefaultPanel('Test');
+    panel.size = { width: 400, height: 120 };
+    panel.position = { x: 100, y: 100 };
+    const onUpdate = vi.fn();
+
+    render(<OverlayView panel={panel} isHovered={true} onUpdate={onUpdate} />);
+    const handleW = screen.getByTestId('resize-handle-w');
+
+    // Simulate mouse drag with screenX / screenY (e.g. dragging left 30px on screen)
+    // clientX in an actual moving window would shift, but screenX remains absolute
+    fireEvent.mouseDown(handleW, {
+      clientX: 5,
+      clientY: 60,
+      screenX: 105,
+      screenY: 160,
+    });
+    fireEvent.mouseMove(window, {
+      clientX: 5, // clientX might not change if window followed mouse
+      clientY: 60,
+      screenX: 75, // screenX moved 30px left
+      screenY: 160,
+    });
+    fireEvent.mouseUp(window);
+
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        position: { x: 70, y: 100 },
+        size: { width: 430, height: 120 },
+      })
+    );
   });
 });

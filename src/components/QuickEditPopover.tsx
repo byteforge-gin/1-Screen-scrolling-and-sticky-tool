@@ -119,11 +119,11 @@ export const QuickEditPopover: React.FC<QuickEditPopoverProps> = ({
   return (
     <div
       data-testid="quick-edit-popover"
-      className="absolute top-10 left-2 right-2 max-w-sm mx-auto z-50 bg-slate-900/95 text-slate-100 border border-slate-700 rounded-lg shadow-2xl p-3 text-xs flex flex-col gap-2.5 backdrop-blur cursor-default select-none"
+      className="absolute top-10 left-2 right-2 max-w-sm mx-auto z-50 bg-slate-900/95 text-slate-100 border border-slate-700 rounded-lg shadow-2xl p-3 text-xs flex flex-col gap-2.5 backdrop-blur cursor-default select-none max-h-[calc(100vh-32px)] overflow-y-auto"
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+      <div className="flex items-center justify-between border-b border-slate-800 pb-1.5 shrink-0">
         <span className="font-semibold text-sky-400">快速设置</span>
         <button
           type="button"
@@ -144,7 +144,7 @@ export const QuickEditPopover: React.FC<QuickEditPopoverProps> = ({
           value={panel.text}
           onChange={handleTextChange}
           rows={2}
-          className="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-xs text-white focus:outline-none focus:border-sky-500 resize-none"
+          className="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-xs text-white focus:outline-none focus:border-sky-500 resize-none select-text"
         />
       </div>
 
@@ -159,7 +159,7 @@ export const QuickEditPopover: React.FC<QuickEditPopoverProps> = ({
             onChange={handleFontSizeChange}
             min={8}
             max={200}
-            className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-sky-500"
+            className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-sky-500 select-text"
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -170,7 +170,7 @@ export const QuickEditPopover: React.FC<QuickEditPopoverProps> = ({
               data-testid="edit-font-color-input"
               value={panel.style.fontColor}
               onChange={handleFontColorChange}
-              className="w-7 h-7 rounded border border-slate-700 cursor-pointer bg-transparent"
+              className="w-7 h-7 rounded border border-slate-700 cursor-pointer bg-transparent select-text"
             />
             <span className="font-mono text-[11px] text-slate-300">{panel.style.fontColor}</span>
           </div>
@@ -187,7 +187,7 @@ export const QuickEditPopover: React.FC<QuickEditPopoverProps> = ({
               data-testid="edit-bg-color-input"
               value={panel.style.bgColor}
               onChange={handleBgColorChange}
-              className="w-7 h-7 rounded border border-slate-700 cursor-pointer bg-transparent"
+              className="w-7 h-7 rounded border border-slate-700 cursor-pointer bg-transparent select-text"
             />
             <span className="font-mono text-[11px] text-slate-300">{panel.style.bgColor}</span>
           </div>
@@ -204,7 +204,7 @@ export const QuickEditPopover: React.FC<QuickEditPopoverProps> = ({
             data-testid="edit-bg-opacity-input"
             value={panel.style.bgOpacity}
             onChange={handleBgOpacityChange}
-            className="w-full accent-sky-500 cursor-pointer mt-1"
+            className="w-full accent-sky-500 cursor-pointer mt-1 select-text"
           />
         </div>
       </div>
@@ -217,7 +217,7 @@ export const QuickEditPopover: React.FC<QuickEditPopoverProps> = ({
             data-testid="edit-scroll-mode-select"
             value={panel.scroll.mode}
             onChange={handleModeChange}
-            className="w-full bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-xs text-white focus:outline-none focus:border-sky-500"
+            className="w-full bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-xs text-white focus:outline-none focus:border-sky-500 select-text"
           >
             <option value="none">静止便签</option>
             <option value="horizontal">水平跑马灯</option>
@@ -233,7 +233,7 @@ export const QuickEditPopover: React.FC<QuickEditPopoverProps> = ({
             onChange={handleSpeedChange}
             min={0}
             max={500}
-            className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-sky-500"
+            className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-sky-500 select-text"
           />
         </div>
       </div>
@@ -249,7 +249,7 @@ export const QuickEditPopover: React.FC<QuickEditPopoverProps> = ({
           data-testid="edit-loop-checkbox"
           checked={panel.scroll.loop}
           onChange={handleLoopChange}
-          className="w-4 h-4 accent-sky-500 rounded cursor-pointer"
+          className="w-4 h-4 accent-sky-500 rounded cursor-pointer select-text"
         />
       </div>
     </div>

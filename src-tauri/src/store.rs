@@ -43,11 +43,11 @@ pub fn load_state_from_file(path: &Path) -> Result<AppState, String> {
 }
 
 pub fn save_state_to_file(path: &Path, state: &AppState) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create parent directory: {}", e))?;
-        }
+    if let Some(parent) = path.parent()
+        && !parent.exists()
+    {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create parent directory: {}", e))?;
     }
 
     let serialized = serde_json::to_string_pretty(state)

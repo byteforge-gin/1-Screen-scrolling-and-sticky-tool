@@ -1,3 +1,4 @@
+use crate::cursor_poller;
 use crate::models::AppState;
 use crate::store;
 use crate::window_manager;
@@ -30,4 +31,9 @@ pub fn open_or_focus_overlay(
 #[tauri::command]
 pub fn close_overlay(app: AppHandle, id: String) -> Result<(), String> {
     window_manager::close_overlay(&app, &id)
+}
+
+#[tauri::command]
+pub fn set_overlay_ignore_cursor(app: AppHandle, id: String, ignore: bool) -> Result<(), String> {
+    cursor_poller::set_overlay_ignore_cursor(&app, &id, ignore)
 }

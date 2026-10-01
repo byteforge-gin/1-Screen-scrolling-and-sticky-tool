@@ -144,7 +144,7 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
   }
 
   return (
-    <div className="w-screen h-screen overflow-hidden bg-transparent m-0 p-0 select-none">
+    <div className="w-full h-full overflow-hidden bg-transparent m-0 p-0 select-none">
       <OverlayView
         panel={panel}
         globalPaused={globalPaused}
@@ -316,7 +316,12 @@ function MainContainer() {
   }, []);
 
   const handleAdd = () => {
-    const newPanel = createDefaultPanel();
+    const offsetCount = state.panels.length;
+    const newPanel = createDefaultPanel(`新建面板 ${offsetCount + 1}`);
+    newPanel.position = {
+      x: 100 + (offsetCount % 8) * 50,
+      y: 100 + (offsetCount % 8) * 50,
+    };
     dispatch({ type: 'ADD_PANEL', payload: newPanel });
     if (newPanel.visible) {
       invoke('open_or_focus_overlay', {

@@ -23,7 +23,18 @@ pub fn open_or_focus_overlay(
         window.set_focus().map_err(|e| format!("set_focus failed: {}", e))?;
     } else {
         log::info!("Creating new WebviewWindow for {}", label);
-        let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::default())
+        let url = if let Some(main_win) = app.get_webview_window("main") {
+            if let Ok(mut main_url) = main_win.url() {
+                main_url.set_fragment(Some(&format!("/overlay/{}", id)));
+                WebviewUrl::External(main_url)
+            } else {
+                WebviewUrl::default()
+            }
+        } else {
+            WebviewUrl::default()
+        };
+
+        let builder = WebviewWindowBuilder::new(app, &label, url.clone())
             .title(format!("Overlay {}", id))
             .transparent(true)
             .background_color(Color(0, 0, 0, 0))
@@ -38,7 +49,7 @@ pub fn open_or_focus_overlay(
 
         match res {
             Ok(window) => {
-                log::info!("Overlay window {} created successfully", label);
+                log::info!("Overlay window {} created successfully with url: {:?}", label, url);
                 let _ = window.show();
             }
             Err(e) => {

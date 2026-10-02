@@ -1,6 +1,7 @@
 import { useReducer, useEffect, useState, useRef, useCallback, Component, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, emit, type UnlistenFn } from '@tauri-apps/api/event';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { panelReducer, DEFAULT_APP_STATE, createDefaultPanel } from './store/panelStore';
 import { AppState, PanelConfig, PanelUpdatePayload } from './types/panel';
 import { MainDashboard } from './components/MainDashboard';
@@ -58,10 +59,16 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [globalPaused, setGlobalPaused] = useState(false);
 
-  // Load initial panel data
+  // Load initial panel data with retry and main window sync
   const [loadError, setLoadError] = useState<string | null>(null);
   useEffect(() => {
     let isCancelled = false;
+    let attempts = 0;
+    const maxAttempts = 4;
+
+    // Immediately ask main window for panel data in case it's in memory
+    emit('panel:request-sync', { id: panelId }).catch(() => {});
+
     async function loadOverlay() {
       try {
         const loaded: AppState = await invoke('load_panels');
@@ -71,14 +78,42 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
           if (found) {
             panelRef.current = found;
             setPanel(found);
+            setIsLoading(false);
+            return;
           }
           if (typeof loaded.globalPaused === 'boolean') {
             setGlobalPaused(loaded.globalPaused);
           }
         }
+
+        // If not found yet and attempts remain, retry shortly
+        if (attempts < maxAttempts) {
+          attempts++;
+          setTimeout(() => {
+            if (!isCancelled) {
+              emit('panel:request-sync', { id: panelId }).catch(() => {});
+              void loadOverlay();
+            }
+          }, 150);
+          return;
+        }
+
+        // Fallback default panel if not found in disk storage
+        if (!panelRef.current) {
+          const fallback = createDefaultPanel('屏幕便签');
+          fallback.id = panelId;
+          panelRef.current = fallback;
+          setPanel(fallback);
+        }
       } catch (err) {
         if (!isCancelled) {
           setLoadError(String((err as Error)?.message || err));
+          if (!panelRef.current) {
+            const fallback = createDefaultPanel('屏幕便签');
+            fallback.id = panelId;
+            panelRef.current = fallback;
+            setPanel(fallback);
+          }
         }
       } finally {
         if (!isCancelled) {
@@ -86,6 +121,7 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
         }
       }
     }
+
     void loadOverlay();
     return () => {
       isCancelled = true;
@@ -108,6 +144,7 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
           }
           panelRef.current = payload;
           setPanel(payload);
+          setIsLoading(false);
         });
         if (isCancelled) unlistenUpdate();
         else unlisteners.push(unlistenUpdate);
@@ -117,6 +154,16 @@ function OverlayContainer({ panelId }: OverlayContainerProps) {
         });
         if (isCancelled) unlistenPause();
         else unlisteners.push(unlistenPause);
+
+        const unlistenClose = await listen<{ id: string }>('panel:close', (event) => {
+          if (event.payload?.id === panelId) {
+            try {
+              void getCurrentWebviewWindow().close();
+            } catch {}
+          }
+        });
+        if (isCancelled) unlistenClose();
+        else unlisteners.push(unlistenClose);
 
         const unlistenSyncRect = await listen<{
           id: string;
@@ -292,6 +339,18 @@ function MainContainer() {
         if (isCancelled) unlistenUpdate();
         else unlisteners.push(unlistenUpdate);
 
+        // Sync request from newly spawned or loading overlay window
+        const unlistenReqSync = await listen<{ id: string }>('panel:request-sync', (event) => {
+          const reqId = event.payload?.id;
+          if (!reqId) return;
+          const found = stateRef.current.panels.find((item) => item.id === reqId);
+          if (found) {
+            emit('panel:update', { ...found, _source: 'main' }).catch(() => {});
+          }
+        });
+        if (isCancelled) unlistenReqSync();
+        else unlisteners.push(unlistenReqSync);
+
         // Overlay moved or resized
         const unlistenSyncRect = await listen<{
           id: string;
@@ -382,6 +441,8 @@ function MainContainer() {
       y: 100 + (offsetCount % 8) * 50,
     };
     dispatch({ type: 'ADD_PANEL', payload: newPanel });
+    emit('panel:update', { ...newPanel, _source: 'main' }).catch(() => {});
+
     if (newPanel.visible) {
       invoke('open_or_focus_overlay', {
         id: newPanel.id,
@@ -421,6 +482,7 @@ function MainContainer() {
 
   const handleDelete = (id: string) => {
     dispatch({ type: 'REMOVE_PANEL', payload: { id } });
+    emit('panel:close', { id }).catch(() => {});
     invoke('close_overlay', { id }).catch((err) => {
       alert(`关闭字幕窗口失败: ${err}`);
     });
@@ -431,7 +493,9 @@ function MainContainer() {
     if (!panel) return;
     const nextVisible = !panel.visible;
     dispatch({ type: 'TOGGLE_VISIBLE', payload: { id } });
+
     if (nextVisible) {
+      emit('panel:update', { ...panel, visible: true, _source: 'main' }).catch(() => {});
       invoke('open_or_focus_overlay', {
         id: panel.id,
         x: panel.position.x,
@@ -442,6 +506,7 @@ function MainContainer() {
         alert(`显示字幕窗口失败 (${panel.name}): ${err}`);
       });
     } else {
+      emit('panel:close', { id: panel.id }).catch(() => {});
       invoke('close_overlay', { id: panel.id }).catch((err) => {
         alert(`隐藏字幕窗口失败 (${panel.name}): ${err}`);
       });

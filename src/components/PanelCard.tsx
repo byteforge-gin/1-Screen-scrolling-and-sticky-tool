@@ -105,7 +105,7 @@ export const PanelCard: React.FC<PanelCardProps> = ({
         </div>
 
         <div className="rounded-lg bg-slate-950/60 p-3 mb-4 border border-slate-800/80 min-h-[56px] flex items-center">
-          <p className="text-sm text-slate-300 line-clamp-2 break-all select-none">
+          <p className="text-sm text-slate-300 line-clamp-3 break-all whitespace-pre-wrap select-none">
             {panel.text || <span className="italic text-slate-500">无内容</span>}
           </p>
         </div>

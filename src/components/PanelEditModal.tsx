@@ -110,7 +110,9 @@ export const PanelEditModal: React.FC<PanelEditModalProps> = ({
                   textAlign: formData.style.textAlign,
                   textShadow: textShadowStyle,
                   width: '100%',
-                  whiteSpace: formData.scroll.mode === 'horizontal' ? 'nowrap' : 'normal',
+                  whiteSpace: formData.scroll.mode === 'horizontal' ? 'pre' : 'pre-wrap',
+                  lineHeight: 1.4,
+                  wordBreak: formData.scroll.mode === 'horizontal' ? 'normal' : 'break-word',
                 }}
               >
                 {formData.text || <span className="opacity-40 italic">（空内容）</span>}
@@ -134,14 +136,14 @@ export const PanelEditModal: React.FC<PanelEditModalProps> = ({
             </div>
 
             <div className="flex flex-col gap-1.5 md:col-span-2">
-              <label className="text-xs font-medium text-slate-300">文字内容</label>
+              <label className="text-xs font-medium text-slate-300">文字内容（支持回车多行换行）</label>
               <textarea
                 data-testid="modal-input-text"
-                rows={3}
+                rows={4}
                 value={formData.text}
                 onChange={(e) => setFormData({ ...formData, text: e.target.value })}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none resize-none"
-                placeholder="请输入要展示滚动的文字内容..."
+                className="w-full rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none resize-y"
+                placeholder="请输入文字内容，可按回车键换行多行展示..."
               />
             </div>
           </div>

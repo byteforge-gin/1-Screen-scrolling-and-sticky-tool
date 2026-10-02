@@ -138,13 +138,14 @@ export const QuickEditPopover: React.FC<QuickEditPopoverProps> = ({
 
       {/* Text Content */}
       <div className="flex flex-col gap-1">
-        <label className="text-slate-400 text-[11px]">文本内容</label>
+        <label className="text-slate-400 text-[11px]">文本内容（支持回车多行）</label>
         <textarea
           data-testid="edit-text-input"
           value={panel.text}
           onChange={handleTextChange}
-          rows={2}
-          className="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-xs text-white focus:outline-none focus:border-sky-500 resize-none select-text"
+          rows={3}
+          placeholder="可按回车换行输入多行..."
+          className="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-xs text-white focus:outline-none focus:border-sky-500 resize-y select-text"
         />
       </div>
 

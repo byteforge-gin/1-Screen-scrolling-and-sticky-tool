@@ -344,7 +344,7 @@ describe('OverlayView', () => {
     render(<OverlayView panel={panel} isHovered={false} onUpdate={() => {}} />);
     const scrollContainer = screen.getByTestId('scroll-content');
     expect(scrollContainer.style.transform).toContain('translateX');
-    expect(scrollContainer.style.whiteSpace).toBe('nowrap');
+    expect(scrollContainer.style.whiteSpace).toBe('pre');
   });
 
   it('renders vertical scroll transform in vertical mode', () => {

@@ -412,9 +412,7 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
         } ${
           panel.scroll.mode === 'horizontal'
             ? 'justify-start items-center'
-            : panel.scroll.mode === 'vertical'
-              ? 'items-start justify-start w-full'
-              : 'items-center justify-start w-full'
+            : 'items-start justify-start w-full'
         }`}
       >
         <div
@@ -423,7 +421,9 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
           className={`pointer-events-auto ${effectiveHover ? 'cursor-move' : ''}`}
           style={{
             transform: getTransform(),
-            whiteSpace: isHorizontal ? 'nowrap' : 'pre-wrap',
+            whiteSpace: isHorizontal ? 'pre' : 'pre-wrap',
+            wordBreak: isHorizontal ? 'normal' : 'break-word',
+            lineHeight: 1.4,
             fontSize: `${panel.style.fontSize}px`,
             color: panel.style.fontColor,
             fontWeight: panel.style.fontWeight,

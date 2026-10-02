@@ -182,20 +182,40 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
       return;
     }
 
-    // Try native OS drag
+    // Try native OS drag first.
+    // In Tauri, startDragging() delegates window moving to the OS window manager
+    // while the mouse button is pressed. It finishes automatically upon mouseup.
+    let isNativeDragging = false;
     try {
-      void getCurrentWebviewWindow().startDragging();
+      const win = getCurrentWebviewWindow();
+      if (win && typeof win.startDragging === 'function') {
+        void win.startDragging();
+        isNativeDragging = true;
+      }
     } catch {
-      // Ignore outside Tauri
+      // Outside Tauri
     }
 
-    // Direct pointer tracking drag fallback (especially robust for Windows WebView2)
+    // If native dragging was triggered, return immediately to avoid registering
+    // redundant JS mousemove listeners that would leak since native drag consumes mouseup.
+    if (isNativeDragging) {
+      return;
+    }
+
+    // Fallback pointer tracking for testing / non-Tauri browser environments
     const startScreenX = e.screenX || e.clientX;
     const startScreenY = e.screenY || e.clientY;
     const startPosX = panel.position.x;
     const startPosY = panel.position.y;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
+      // Safety check: if left mouse button is not held down, clean up immediately
+      if (moveEvent.buttons !== 1) {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        return;
+      }
+
       moveEvent.preventDefault();
       const currentX = moveEvent.screenX || moveEvent.clientX;
       const currentY = moveEvent.screenY || moveEvent.clientY;
@@ -285,7 +305,6 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
     <div
       ref={containerRef}
       data-testid="overlay-container"
-      data-tauri-drag-region
       onMouseEnter={() => setInternalHover(true)}
       onMouseLeave={() => setInternalHover(false)}
       onMouseDown={handlePanelMouseDown}
@@ -304,13 +323,11 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
       {effectiveHover && (
         <div
           data-testid="overlay-controls"
-          data-tauri-drag-region
           className="absolute top-1 left-1 right-1 z-40 flex items-center justify-between px-2 py-1 bg-slate-900/85 backdrop-blur text-white rounded shadow text-xs border border-slate-700/60 cursor-move"
         >
           {/* Drag Handle */}
           <div
             data-testid="drag-handle"
-            data-tauri-drag-region
             className="flex items-center gap-1 cursor-grab active:cursor-grabbing text-slate-300 hover:text-white px-1 py-0.5 rounded hover:bg-slate-800"
             title="按住拖拽窗口"
           >
@@ -390,7 +407,6 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
       {/* Text / Scrolling Content Viewport */}
       <div
         data-testid="scroll-viewport"
-        data-tauri-drag-region
         className={`w-full h-full overflow-hidden p-2 flex ${
           effectiveHover ? 'cursor-move' : ''
         } ${
@@ -404,7 +420,6 @@ export const OverlayView: React.FC<OverlayViewProps> = ({
         <div
           ref={contentRef}
           data-testid="scroll-content"
-          data-tauri-drag-region
           className={`pointer-events-auto ${effectiveHover ? 'cursor-move' : ''}`}
           style={{
             transform: getTransform(),
